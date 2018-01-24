@@ -9,6 +9,12 @@ shopt -s extglob
 
 TEST_FILE=${1:-test.json}
 
+function kill_lambda {
+  echo "Killing lambda with PGID: ${LAMBDA_PID}"
+  PGID=$(ps  xao pid,pgid | grep ^${LAMBDA_PID} | cut -d ' ' -f2)
+  kill -TERM -${PGID} # kill 'go run' and the lambda function server
+}
+
 RPC_PORT=10101
 
 NODE_ENV=development \
@@ -17,6 +23,8 @@ AWS_LAMBDA_FUNCTION_NAME=$(basename `pwd`) \
 AWS_LAMBDA_FUNCTION_VERSION=1 \
 go run !(*_test).go &
 
+LAMBDA_PID=$!
+trap kill_lambda EXIT
+
 _LAMBDA_SERVER_PORT=${RPC_PORT} bin/run-go-lambda ${TEST_FILE}
 
-kill %1 # kill the lambda function server
