@@ -26,5 +26,5 @@ go run !(*_test).go &
 LAMBDA_PID=$!
 trap kill_lambda EXIT
 
-_LAMBDA_SERVER_PORT=${RPC_PORT} bin/run-go-lambda ${TEST_FILE}
+_LAMBDA_SERVER_PORT=${RPC_PORT} bin/run-go-lambda -f ${TEST_FILE} -t 300
 
