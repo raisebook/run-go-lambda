@@ -23,12 +23,14 @@ var (
 	payloadFile string
 )
 
+// initialize command options
 func init() {
 	rootCmd.Flags().Int64VarP(&timeout, "timeout", "t", 300, "duration of timeout")
 	rootCmd.Flags().StringVarP(&payloadFile, "file", "f", "", "JSON file")
 	rootCmd.MarkFlagRequired("file")
 }
 
+// invoke the lambda
 func invoke(cmd *cobra.Command, args []string) error {
 
 	req := &messages.InvokeRequest{
@@ -43,11 +45,13 @@ func invoke(cmd *cobra.Command, args []string) error {
 
 	var response *messages.InvokeResponse
 	err := client.Call("Function.Invoke", req, &response)
-	return err
-	/*if err != nil { # TODO handle error
-	    log.Println("Invocation:", err)
-	    log.Fatal("Response:", response)
-	}*/
+
+	if err != nil {
+		log.Println("Invocation:", err)
+		log.Fatal("Response:", response)
+		return err
+	}
+	return nil
 }
 
 func main() {
