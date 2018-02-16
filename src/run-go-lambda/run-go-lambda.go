@@ -10,6 +10,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 
+	"errors"
 	"github.com/aws/aws-lambda-go/lambda/messages"
 	"github.com/spf13/cobra"
 )
@@ -18,16 +19,26 @@ var (
 	rootCmd = &cobra.Command{
 		Use:  "run-go-lambda",
 		RunE: invoke,
+		Args: func(cmd *cobra.Command, args []string) error {
+			file := cmd.Flag("file")
+			if file.Value.String() == "" && len(args) < 1 {
+				return errors.New("requires at least a file input a stdin JSON")
+			}
+			if len(args) > 0 {
+				payloadStdIn = args[0]
+			}
+			return nil
+		},
 	}
-	timeout     int64
-	payloadFile string
+	timeout      int64
+	payloadFile  string
+	payloadStdIn string
 )
 
 // initialize command options
 func init() {
 	rootCmd.Flags().Int64VarP(&timeout, "timeout", "t", 300, "duration of timeout")
 	rootCmd.Flags().StringVarP(&payloadFile, "file", "f", "", "JSON file")
-	rootCmd.MarkFlagRequired("file")
 }
 
 // invoke the lambda
@@ -56,17 +67,21 @@ func invoke(cmd *cobra.Command, args []string) error {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		os.Exit(1)
 	}
 
 }
 
 func readPayload() []byte {
-	payload, err := ioutil.ReadFile(payloadFile)
-	if err != nil {
-		log.Fatal(err)
+	if payloadFile != "" {
+		payload, err := ioutil.ReadFile(payloadFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return payload
+	} else {
+		return []byte(payloadStdIn)
 	}
-	return payload
 }
 
 func connect() *rpc.Client {
