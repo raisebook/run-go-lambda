@@ -11,29 +11,58 @@ import (
 	"github.com/cenkalti/backoff"
 
 	"github.com/aws/aws-lambda-go/lambda/messages"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	args := &messages.InvokeRequest{
+var (
+	rootCmd = &cobra.Command{
+		Use:  "run-go-lambda",
+		RunE: invoke,
+	}
+	timeout     int64
+	payloadFile string
+)
+
+// initialize command options
+func init() {
+	rootCmd.Flags().Int64VarP(&timeout, "timeout", "t", 300, "duration of timeout")
+	rootCmd.Flags().StringVarP(&payloadFile, "file", "f", "", "JSON file")
+	rootCmd.MarkFlagRequired("file")
+}
+
+// invoke the lambda
+func invoke(cmd *cobra.Command, args []string) error {
+
+	req := &messages.InvokeRequest{
 		Payload:            readPayload(),
 		RequestId:          "1",
 		XAmznTraceId:       "1",
-		Deadline:           messages.InvokeRequest_Timestamp{Seconds: 300, Nanos: 0},
+		Deadline:           messages.InvokeRequest_Timestamp{Seconds: timeout, Nanos: 0},
 		InvokedFunctionArn: "arn:aws:lambda:an-antarctica-1:123456789100:function:test",
 	}
 
 	client := connect()
 
 	var response *messages.InvokeResponse
-	err := client.Call("Function.Invoke", args, &response)
+	err := client.Call("Function.Invoke", req, &response)
+
 	if err != nil {
 		log.Println("Invocation:", err)
 		log.Fatal("Response:", response)
+		return err
 	}
+	return nil
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 func readPayload() []byte {
-	payload, err := ioutil.ReadFile(os.Args[1])
+	payload, err := ioutil.ReadFile(payloadFile)
 	if err != nil {
 		log.Fatal(err)
 	}
