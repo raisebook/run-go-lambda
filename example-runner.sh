@@ -11,7 +11,7 @@ TEST_FILE=${1:-test.json}
 
 function kill_lambda {
   echo "Killing lambda with PGID: ${LAMBDA_PID}"
-  PGID=$(ps  xao pid,pgid | grep ^${LAMBDA_PID} | cut -d ' ' -f2)
+  PGID=$(ps  xao pid,pgid | awk '{$1=$1};1'| grep ^${LAMBDA_PID} | cut -d ' ' -f2)
   kill -TERM -${PGID} # kill 'go run' and the lambda function server
 }
 
