@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/rpc"
@@ -10,7 +13,6 @@ import (
 
 	"github.com/cenkalti/backoff"
 
-	"errors"
 	"github.com/aws/aws-lambda-go/lambda/messages"
 	"github.com/spf13/cobra"
 )
@@ -20,12 +22,10 @@ var (
 		Use:  "run-go-lambda",
 		RunE: invoke,
 		Args: func(cmd *cobra.Command, args []string) error {
+			readStdIn()
 			file := cmd.Flag("file")
-			if file.Value.String() == "" && len(args) < 1 {
+			if file.Value.String() == "" && len(payloadStdIn) == 0 {
 				return errors.New("requires at least a file input a stdin JSON")
-			}
-			if len(args) > 0 {
-				payloadStdIn = args[0]
 			}
 			return nil
 		},
@@ -39,6 +39,22 @@ var (
 func init() {
 	rootCmd.Flags().Int64VarP(&timeout, "timeout", "t", 300, "duration of timeout")
 	rootCmd.Flags().StringVarP(&payloadFile, "file", "f", "", "JSON file")
+}
+
+func readStdIn() {
+	file := os.Stdin
+	fi, _ := file.Stat()
+	reader := bufio.NewReader(os.Stdin)
+	size := fi.Size()
+	if size != 0 {
+		for {
+			input, err := reader.ReadString('\n')
+			payloadStdIn = payloadStdIn + input
+			if err != nil && err == io.EOF {
+				break
+			}
+		}
+	}
 }
 
 // invoke the lambda
@@ -79,9 +95,8 @@ func readPayload() []byte {
 			log.Fatal(err)
 		}
 		return payload
-	} else {
-		return []byte(payloadStdIn)
 	}
+	return []byte(payloadStdIn)
 }
 
 func connect() *rpc.Client {
