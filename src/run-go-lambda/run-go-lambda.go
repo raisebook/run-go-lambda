@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/rpc"
@@ -42,19 +40,11 @@ func init() {
 }
 
 func readStdIn() {
-	file := os.Stdin
-	fi, _ := file.Stat()
-	reader := bufio.NewReader(os.Stdin)
-	size := fi.Size()
-	if size != 0 {
-		for {
-			input, err := reader.ReadString('\n')
-			payloadStdIn = payloadStdIn + input
-			if err != nil && err == io.EOF {
-				break
-			}
-		}
+	data, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		panic(err)
 	}
+	payloadStdIn = string(data)
 }
 
 // invoke the lambda
