@@ -19,18 +19,10 @@ var (
 	rootCmd = &cobra.Command{
 		Use:  "run-go-lambda",
 		RunE: invoke,
-		Args: func(cmd *cobra.Command, args []string) error {
-			readStdIn()
-			file := cmd.Flag("file")
-			if file.Value.String() == "" && len(payloadStdIn) == 0 {
-				return errors.New("requires at least a file input a stdin JSON")
-			}
-			return nil
-		},
 	}
 	timeout      int64
 	payloadFile  string
-	payloadStdIn string
+	payloadStdIn []byte
 )
 
 // initialize command options
@@ -39,19 +31,28 @@ func init() {
 	rootCmd.Flags().StringVarP(&payloadFile, "file", "f", "", "JSON file")
 }
 
-func readStdIn() {
-	data, err := ioutil.ReadAll(os.Stdin)
-	if err != nil {
-		panic(err)
+func readStdIn() []byte {
+	file := os.Stdin
+	fi, _ := file.Stat()
+	size := fi.Size()
+	if size != 0 {
+		data, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			panic(err)
+		}
+		return data
 	}
-	payloadStdIn = string(data)
+	return nil
 }
 
 // invoke the lambda
 func invoke(cmd *cobra.Command, args []string) error {
-
+	data, err := readPayload()
+	if err != nil {
+		return err
+	}
 	req := &messages.InvokeRequest{
-		Payload:            readPayload(),
+		Payload:            data,
 		RequestId:          "1",
 		XAmznTraceId:       "1",
 		Deadline:           messages.InvokeRequest_Timestamp{Seconds: timeout, Nanos: 0},
@@ -61,7 +62,7 @@ func invoke(cmd *cobra.Command, args []string) error {
 	client := connect()
 
 	var response *messages.InvokeResponse
-	err := client.Call("Function.Invoke", req, &response)
+	err = client.Call("Function.Invoke", req, &response)
 
 	if err != nil {
 		log.Println("Invocation:", err)
@@ -78,15 +79,19 @@ func main() {
 
 }
 
-func readPayload() []byte {
+func readPayload() ([]byte, error) {
+	payloadStdIn = readStdIn()
+	if len(payloadStdIn) != 0 {
+		return payloadStdIn, nil
+	}
 	if payloadFile != "" {
 		payload, err := ioutil.ReadFile(payloadFile)
 		if err != nil {
 			log.Fatal(err)
 		}
-		return payload
+		return payload, nil
 	}
-	return []byte(payloadStdIn)
+	return nil, errors.New("requires at least a file input a stdin JSON")
 }
 
 func connect() *rpc.Client {
