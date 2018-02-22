@@ -17,24 +17,69 @@ import (
 var (
 	rootCmd = &cobra.Command{
 		Use:  "run-go-lambda",
-		RunE: invoke,
+		RunE: run,
 	}
-	timeout     int64
-	payloadFile string
+	timeout      int64
+	payloadFile  string
 )
 
 // initialize command options
 func init() {
 	rootCmd.Flags().Int64VarP(&timeout, "timeout", "t", 300, "duration of timeout")
 	rootCmd.Flags().StringVarP(&payloadFile, "file", "f", "", "JSON file")
-	rootCmd.MarkFlagRequired("file")
 }
 
-// invoke the lambda
-func invoke(cmd *cobra.Command, args []string) error {
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
 
+func run(cmd *cobra.Command, _ []string) error {
+	var data []byte
+	var err error
+
+	if cmd.Flag("file").Changed {
+		if payloadFile == "" {
+			log.Fatal("Error: You must specify a filename if you pass the -f/--file flag")
+		}
+		data, err = readInputFile()
+	} else {
+		data = readStdIn()
+	}
+	if err != nil {
+		return err
+	}
+
+	return invoke(data)
+}
+
+func readInputFile() ([]byte, error) {
+	payload, err := ioutil.ReadFile(payloadFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return payload, nil
+}
+
+func readStdIn() []byte {
+	file := os.Stdin
+	fi, _ := file.Stat()
+	size := fi.Size()
+	if size == 0 {
+		log.Fatal("Error: Expecting input on stdin, if no -f/--file flag passed.")
+	}
+
+	data, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return data
+}
+
+func invoke(data []byte) error {
 	req := &messages.InvokeRequest{
-		Payload:            readPayload(),
+		Payload:            data,
 		RequestId:          "1",
 		XAmznTraceId:       "1",
 		Deadline:           messages.InvokeRequest_Timestamp{Seconds: timeout, Nanos: 0},
@@ -49,24 +94,8 @@ func invoke(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		log.Println("Invocation:", err)
 		log.Fatal("Response:", response)
-		return err
 	}
 	return nil
-}
-
-func main() {
-	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
-
-}
-
-func readPayload() []byte {
-	payload, err := ioutil.ReadFile(payloadFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return payload
 }
 
 func connect() *rpc.Client {
