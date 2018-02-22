@@ -41,8 +41,7 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	if cmd.Flag("file").Changed {
 		if payloadFile == "" {
-			fmt.Fprintln(os.Stderr, "Error: You must specify a filename if you pass the -f/--file flag")
-			os.Exit(1)
+			log.Fatal("Error: You must specify a filename if you pass the -f/--file flag")
 		}
 		data, err = readInputFile()
 	} else {
